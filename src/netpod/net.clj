@@ -34,19 +34,44 @@
     (.read input-stream bytea 0 length)
     (.put bytebuf bytea 0 length)))
 
-(defn out-stream->in-stream
-  "turns io.ByteArrayOutputStream to io.ByteArrayInputStream"
-  [out-stream]
-  (ByteArrayInputStream. (.toByteArray out-stream)))
+(defn is-byte-array? [x]
+  (instance? (Class/forName "[B") x))
+
+(defn b-encode
+  "encodes a thing to a byte array"
+  [thing]
+  (let [out (ByteArrayOutputStream.)]
+    (write-bencode out thing)
+    (.toByteArray out)))
+
+(defn ba->str
+  "recursively crawls structures and decodes any bytearrea to str using UTF-8"
+  [thing]
+  (let [charset "UTF-8"]
+    (cond
+      (is-byte-array? thing) (String. thing charset)
+      (map? thing) (reduce-kv
+                    (fn [acc k v]
+                      (assoc acc k (ba->str v))) {} thing)
+      (vector? thing) (vec (map ba->str thing))
+      :else thing)))
+
+(defn b-decode
+  "decodes a byte array into a thing"
+  [bytea]
+  (let [in (PushbackInputStream. (ByteArrayInputStream. bytea))
+        decoded-thing (read-bencode in)]
+    (ba->str decoded-thing)))
 
 (defn send-msg
   "writes data to unix socket and returns a response"
   [path msg]
   (with-open [channel (SocketChannel/open StandardProtocolFamily/UNIX)]
-    (let [buffer (ByteBuffer/allocate 4)
-          bytea (byte-array 1024)
+    (let [buffer (ByteBuffer/allocate 4096)
+          bytea (byte-array 4096)
           output-stream (ByteArrayOutputStream.)
-          src (out-stream->in-stream (write-bencode (ByteArrayOutputStream.) msg))]
+          src (ByteArrayInputStream. (b-encode msg))]
+      (.reset output-stream)
       (.connect channel (path->socket-address path))
       (while (pos? (.available src))
         ;;ready for writing
@@ -64,4 +89,4 @@
         ;; write to BAOS
         (copy-niobuf-to-output-stream buffer output-stream bytea)
         (.clear buffer))
-      (read-bencode (PushbackInputStream. (out-stream->in-stream output-stream))))))
+      (b-decode (.toByteArray output-stream)))))

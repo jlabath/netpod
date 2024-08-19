@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -46,15 +47,54 @@ func main() {
 
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
-	var requestMsg string
+	var requestMsg Request
 	if err := bencode.Unmarshal(conn, &requestMsg); err != nil {
 		log.Printf("Trouble decoding request %v", err)
 	}
-	log.Printf("Received: %s", requestMsg)
+	log.Printf("Received: %+v", requestMsg)
 	//now respond
-	if err := bencode.Marshal(conn, fmt.Sprintf("hi %s", requestMsg)); err != nil {
-		log.Printf("Trouble encoding response %v", err)
+	if err := handleRequest(conn, &requestMsg); err != nil {
+		log.Printf("Trouble in response %v", err)
 	}
+	/*if err := bencode.Marshal(conn, fmt.Sprintf("hi %s", requestMsg.Op)); err != nil {
+		log.Printf("Trouble encoding response %v", err)
+	}*/
 
 	log.Printf("Connection closed")
+}
+
+type Operation string
+
+const (
+	Describe Operation = "describe"
+	Invoke   Operation = "invoke"
+)
+
+type Request struct {
+	Op Operation `bencode:"op"`
+}
+
+type DescribeResponse struct {
+	Format     string      `bencode:"format"`
+	Namespaces []Namespace `bencode:"namespaces"`
+}
+
+type Namespace struct {
+	Name string `bencode:"name"`
+}
+
+var namespace = Namespace{
+	Name: "sample.service",
+}
+
+func handleRequest(w io.Writer, r *Request) error {
+	switch r.Op {
+	case Describe:
+		return bencode.Marshal(w, DescribeResponse{
+			Format:     "json",
+			Namespaces: []Namespace{namespace},
+		})
+	default:
+		return fmt.Errorf("Unexpected op %v", r.Op)
+	}
 }
