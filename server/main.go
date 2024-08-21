@@ -54,7 +54,14 @@ func handleConnection(conn net.Conn) {
 	log.Printf("Received: %+v", requestMsg)
 	//now respond
 	if err := handleRequest(conn, &requestMsg); err != nil {
-		log.Printf("Trouble in response %v", err)
+		log.Printf("Trouble when responding to %+v response error %v", requestMsg, err)
+		if err := bencode.Marshal(conn, ErrorResponse{
+			Id:        requestMsg.Id,
+			Status:    ErrorStat,
+			ExMessage: err.Error(),
+		}); err != nil {
+			log.Printf("Trouble encoding error response %v", err)
+		}
 	}
 	/*if err := bencode.Marshal(conn, fmt.Sprintf("hi %s", requestMsg.Op)); err != nil {
 		log.Printf("Trouble encoding response %v", err)
@@ -71,6 +78,7 @@ const (
 )
 
 type Request struct {
+	Id string    `bencode:"id,omitempty"`
 	Op Operation `bencode:"op"`
 }
 
@@ -100,6 +108,13 @@ type InvokeResponse struct {
 	Id     string `bencode:"id"`
 	Status Status `bencode:"status"`
 	Value  string `bencode:"value"`
+}
+
+type ErrorResponse struct {
+	Id        string `bencode:"id,omitempty"`
+	Status    Status `bencode:"status"`
+	ExMessage string `bencode:"ex-message"`
+	ExData    string `bencode:"ex-data,omitempty"`
 }
 
 type InvokeHandler func(argstr string) (InvokeResponse, error)
