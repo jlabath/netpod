@@ -81,18 +81,38 @@ type DescribeResponse struct {
 
 type Namespace struct {
 	Name string `bencode:"name"`
+	Vars []Var  `bencode:"vars"`
 }
 
-var namespace = Namespace{
-	Name: "sample.service",
+type Var struct {
+	Name    string        `bencode:"name"`
+	Handler InvokeHandler `bencode:"-"`
 }
+
+type Status string
+
+const (
+	DoneStat  Status = "done"
+	ErrorStat Status = "error"
+)
+
+type InvokeResponse struct {
+	Id     string `bencode:"id"`
+	Status Status `bencode:"status"`
+	Value  string `bencode:"value"`
+}
+
+type InvokeHandler func(argstr string) (InvokeResponse, error)
 
 func handleRequest(w io.Writer, r *Request) error {
 	switch r.Op {
 	case Describe:
 		return bencode.Marshal(w, DescribeResponse{
-			Format:     "json",
-			Namespaces: []Namespace{namespace},
+			Format: "json",
+			Namespaces: []Namespace{Namespace{
+				Name: "sample.service",
+				Vars: []Var{Var{Name: "greet"}},
+			}},
 		})
 	default:
 		return fmt.Errorf("Unexpected op %v", r.Op)

@@ -5,3 +5,8 @@
 
 (comment (prn (String. (send-msg "./server/server.sock" {"op" "describe"}))))
 (pods/load-pod "./server/server.sock")
+;;check pod namespace exists
+(println "sample.service ns exists =>" (some? (find-ns 'sample.service)))
+(require '[sample.service :as srv])
+(srv/greet "hello")
+(srv/greet)
