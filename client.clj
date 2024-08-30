@@ -4,15 +4,20 @@
          '[netpod.pods :as pods]
          '[clojure.core.async :refer [<!]])
 
-(comment (prn (String. (send-msg "./server/server.sock" {"op" "describe"}))))
 (pods/load-pod "./server/server.sock")
-;;check pod namespace exists
-(println "sample.service ns exists =>" (some? (find-ns 'sample.service)))
-(require '[sample.service :as srv])
 
-(let [ch (srv/greet "john")
-      result (<! ch)]
-  (prn "got from server" result))
+(def lazy-code
+  '(do
+     (require '[sample.service :as srv])
+     (let [ch (srv/greet "john")
+           result (<! ch)]
+       (prn "got from server" result))
+     (let [ch (srv/broken-func "fred")
+           result (<! ch)]
+       (prn "got from server" result))))
 
-;;(srv/greet)
+;;call it if we have the namespace
+(when (some? (find-ns 'sample.service))
+  (eval lazy-code))
+
 

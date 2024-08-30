@@ -1,21 +1,38 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net"
 	"os"
+	"time"
 
 	bencode "github.com/jackpal/bencode-go"
 )
 
-func greetHandle(r *Request) (InvokeResponse, error) {
-	return InvokeResponse{
-		Id:     r.Id,
-		Value:  "\"hello there\"",
-		Status: DoneStat,
-	}, nil
+func greetHandler(encodedArgs []json.RawMessage) (json.RawMessage, error) {
+	if len(encodedArgs) < 1 {
+		return nil, fmt.Errorf("invalid number of arguments passed to server")
+	}
+	var name string
+
+	if err := json.Unmarshal(encodedArgs[0], &name); err != nil {
+		return nil, err
+	}
+
+	//sleep somewhat
+	time.Sleep(time.Millisecond * time.Duration(rand.Intn(1000)+1))
+
+	return json.Marshal(fmt.Sprintf("hi there %s", name))
+}
+
+func brokenHandler(encodedArgs []json.RawMessage) (json.RawMessage, error) {
+	//sleep somewhat
+	time.Sleep(time.Millisecond * time.Duration(rand.Intn(1000)+1))
+	return nil, fmt.Errorf("this will fail")
 }
 
 //this is how one can talk to this server
@@ -30,6 +47,9 @@ func main() {
 		log.Fatalf("Failed to remove existing socket file: %v", err)
 	}
 
+	//init rand num gen
+	rand.Seed(time.Now().UnixNano())
+
 	//describe response
 	describe := DescribeResponse{
 		Format: "json",
@@ -37,8 +57,12 @@ func main() {
 			Name: "sample.service",
 			Vars: []Var{Var{
 				Name:    "greet",
-				Handler: greetHandle,
-			}},
+				Handler: greetHandler,
+			},
+				Var{
+					Name:    "broken-func",
+					Handler: brokenHandler,
+				}},
 		}},
 	}
 	//craft handelr map for fast lookups
@@ -67,7 +91,7 @@ func main() {
 	}
 }
 
-func handleConnection(desc *DescribeResponse, handlerMap map[string]InvokeHandler, conn net.Conn) {
+func handleConnection(desc *DescribeResponse, handlerMap map[string]Handler, conn net.Conn) {
 	defer conn.Close()
 	var requestMsg Request
 	if err := bencode.Unmarshal(conn, &requestMsg); err != nil {
@@ -111,8 +135,8 @@ type DescribeResponse struct {
 	Namespaces []Namespace `bencode:"namespaces"`
 }
 
-func (d *DescribeResponse) handlerMap() map[string]InvokeHandler {
-	m := make(map[string]InvokeHandler)
+func (d *DescribeResponse) handlerMap() map[string]Handler {
+	m := make(map[string]Handler)
 	for _, ns := range d.Namespaces {
 		for _, v := range ns.Vars {
 			m[fmt.Sprintf("%s/%s", ns.Name, v.Name)] = v.Handler
@@ -127,8 +151,8 @@ type Namespace struct {
 }
 
 type Var struct {
-	Name    string        `bencode:"name"`
-	Handler InvokeHandler `bencode:"-"`
+	Name    string  `bencode:"name"`
+	Handler Handler `bencode:"-"`
 }
 
 type Status string
@@ -151,19 +175,29 @@ type ErrorResponse struct {
 	ExData    string `bencode:"ex-data,omitempty"`
 }
 
-type InvokeHandler func(r *Request) (InvokeResponse, error)
+type Handler func(args []json.RawMessage) (json.RawMessage, error)
 
-func handleRequest(desc *DescribeResponse, handlerMap map[string]InvokeHandler, w io.Writer, r *Request) error {
+func handleRequest(desc *DescribeResponse, handlerMap map[string]Handler, w io.Writer, r *Request) error {
 	switch r.Op {
 	case Describe:
 		return bencode.Marshal(w, *desc)
 	case Invoke:
 		h, ok := handlerMap[r.Var]
 		if ok {
-			if resp, err := h(r); err != nil {
+			var args []json.RawMessage
+			if err := json.Unmarshal([]byte(r.Args), &args); err != nil {
+				return err
+			}
+			if resp, err := h(args); err != nil {
 				return err
 			} else {
-				return bencode.Marshal(w, resp)
+				iRes := InvokeResponse{
+					Id:     r.Id,
+					Status: DoneStat,
+					Value:  string([]byte(resp)),
+				}
+
+				return bencode.Marshal(w, iRes)
 			}
 		} else {
 			return fmt.Errorf("Var %s not found", r.Var)
