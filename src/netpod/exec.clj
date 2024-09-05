@@ -1,5 +1,5 @@
 (ns netpod.exec
-  (:require [clojure.core.async :as a :refer [>!!]])
+  (:require [clojure.core.async :as a :refer [>!! <!!]])
   (:import [java.util.concurrent Executors]))
 
 (defonce executor (Executors/newVirtualThreadPerTaskExecutor))
@@ -20,3 +20,10 @@ calling thread. Returns a channel which will receive the result of
                        (>!! ch res)
                        (a/close! ch)) args)
     ch))
+
+(defn sync-send
+  "Executes f with args in another thread, blocking until the thread returns the result of (apply f args)."
+  [f & args]
+  (let
+   [ch (apply async-send f args)]
+    (<!! ch)))

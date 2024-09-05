@@ -22,17 +22,25 @@
   [path ns-symbol var-desc]
   (let [var-name (get var-desc "name")
         var-sym (symbol var-name)
-        ns-name (str ns-symbol)]
-    (intern ns-symbol var-sym (fn [& args]
+        chan-var-sym (symbol (format "%s-chan" var-name))
+        ns-name (str ns-symbol)
+        fn-body-chan (partial ret-ex-as-value send-req path)
+        base-req {:op "invoke"
+                  :var (format "%s/%s" ns-name var-name)}]
+    (intern ns-symbol chan-var-sym (fn [& args]
                                 ;;encode args to json
                                 ;;craft invoke request
                                 ;;send it via executor
+                                     (let [enc-args (json/generate-string args)
+                                           req (assoc base-req :id (generate-uuid) :args enc-args)]
+                                       (exec/async-send #(fn-body-chan req)))))
+    (intern ns-symbol var-sym (fn [& args]
+                                ;;encode args to json
+                                ;;craft invoke request
+                                ;;send it via sync-send
                                 (let [enc-args (json/generate-string args)
-                                      req {:op "invoke"
-                                           :id (generate-uuid)
-                                           :var (format "%s/%s" ns-name var-name)
-                                           :args enc-args}]
-                                  (exec/async-send #(ret-ex-as-value send-req path req)))))))
+                                      req (assoc base-req :id (generate-uuid) :args enc-args)]
+                                  (exec/sync-send #(fn-body-chan req)))))))
 
 (defn make-ns
   "make namespace as provided via the describe msg received"
