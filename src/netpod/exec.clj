@@ -27,3 +27,12 @@ calling thread. Returns a channel which will receive the result of
   (let
    [ch (apply async-send f args)]
     (<!! ch)))
+
+(defn delay-send
+  "Executes f with args in another thread delivering result to a promise once it is available, delay-send returns that promise to caller."
+  [f & args]
+  (let
+   [p (promise)]
+    (apply send-cb f #(deliver p %) args)
+    p))
+

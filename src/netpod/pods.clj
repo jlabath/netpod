@@ -23,6 +23,7 @@
   (let [var-name (get var-desc "name")
         var-sym (symbol var-name)
         chan-var-sym (symbol (format "%s-chan" var-name))
+        prom-var-sym (symbol (format "%s-delay" var-name))
         ns-name (str ns-symbol)
         fn-body-chan (partial ret-ex-as-value send-req path)
         base-req {:op "invoke"
@@ -40,7 +41,14 @@
                                 ;;send it via sync-send
                                 (let [enc-args (json/generate-string args)
                                       req (assoc base-req :id (generate-uuid) :args enc-args)]
-                                  (exec/sync-send #(fn-body-chan req)))))))
+                                  (exec/sync-send #(fn-body-chan req)))))
+    (intern ns-symbol prom-var-sym (fn [& args]
+                                ;;encode args to json
+                                ;;craft invoke request
+                                ;;send it via sync-send
+                                     (let [enc-args (json/generate-string args)
+                                           req (assoc base-req :id (generate-uuid) :args enc-args)]
+                                       (exec/delay-send #(fn-body-chan req)))))))
 
 (defn make-ns
   "make namespace as provided via the describe msg received"
