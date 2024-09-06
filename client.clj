@@ -1,12 +1,16 @@
 #!/usr/bin/env bb
 
-(require '[netpod.pods :as pods]
-         '[clojure.core.async :as a :refer [<!]])
+(require
+ '[babashka.process :as process]
+ '[clojure.core.async :as a :refer [<!]]
+ '[netpod.pods :as pods])
 
 (def socket-path "/tmp/sample-service.sock")
 
 ;; start a process to run in the background
-(when (= :timeout (deref (pods/start-pod "./server/server" socket-path) 2000 :timeout))
+(def child-process (pods/start-pod "./server/server" socket-path))
+;;wait for it to start - with timeout 2s timeout
+(when (= :timeout (deref child-process 2000 :timeout))
   (throw (ex-info "timeout reached while waiting on pod to start" {})))
 
 ;;load pod from netpod
@@ -46,3 +50,5 @@
 (when (some? (find-ns 'sample.service))
   (eval lazy-code))
 
+;;turn off the child process at the end
+(process/destroy @child-process)
