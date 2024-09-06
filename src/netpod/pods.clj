@@ -1,5 +1,7 @@
 (ns netpod.pods
-  (:require [cheshire.core :as json]
+  (:require [babashka.process :refer [process]]
+            [cheshire.core :as json]
+            [clojure.java.io :as io]
             [netpod.exec :as exec]
             [netpod.net :as net]
             [netpod.util :refer [ret-ex-as-value]])
@@ -68,3 +70,22 @@
       ;;(prn data)
       (doall (map #(make-ns path %) (get data "namespaces"))))
     (catch java.lang.Exception e e)))
+
+(defn start-pod
+  "starts the netpod via shell as a subprocess 
+   the pod process is expected to accept the socket path as its first argument
+   this function returns a promise
+  "
+  [pod-path socket-path]
+  (.delete (io/file socket-path))
+  (let [prom (promise)
+        background-proc (process [pod-path socket-path] {:wait false})]
+    (exec/delay-send
+     (fn []
+
+       (loop []
+         (when (not (.exists (io/file socket-path)))
+           (Thread/sleep 100)
+           (recur)))
+       (deliver prom background-proc)))
+    prom))

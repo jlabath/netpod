@@ -1,20 +1,13 @@
 #!/usr/bin/env bb
 
-(require '[netpod.net :refer [send-msg]]
-         '[netpod.pods :as pods]
-         '[clojure.core.async :as a :refer [<!]]
-         '[babashka.process :refer [process]]
-         '[clojure.java.io :as io])
+(require '[netpod.pods :as pods]
+         '[clojure.core.async :as a :refer [<!]])
 
 (def socket-path "/tmp/sample-service.sock")
 
-;; Start a process to run in the background
-(def background-process (process ["./server/server" socket-path] {:wait false}))
-
-(loop []
-  (when (not (.exists (io/file socket-path)))
-    (Thread/sleep 100)
-    (recur)))
+;; start a process to run in the background
+(when (= :timeout (deref (pods/start-pod "./server/server" socket-path) 2000 :timeout))
+  (throw (ex-info "timeout reached while waiting on pod to start" {})))
 
 ;;load pod from netpod
 (pods/load-pod socket-path)
