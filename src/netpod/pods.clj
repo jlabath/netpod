@@ -1,5 +1,6 @@
 (ns netpod.pods
-  (:require [babashka.process :refer [process]]
+  (:require [babashka.fs :as fs]
+            [babashka.process :as process :refer [process]]
             [cheshire.core :as json]
             [clojure.java.io :as io]
             [netpod.exec :as exec]
@@ -7,10 +8,10 @@
             [netpod.util :refer [ret-ex-as-value]])
   (:import [java.util UUID]))
 
-(defn generate-uuid []
+(defn- generate-uuid []
   (str (UUID/randomUUID)))
 
-(defn send-req
+(defn- send-req
   "sends a request via send-msg and the parses the response"
   [path req]
   (let [response (net/send-msg path req)]
@@ -19,7 +20,7 @@
       "error" (ex-info (get response "ex-message") (get response "ex-data" {}))
       (ex-info "invalid response" response))))
 
-(defn make-fn
+(defn- make-fn
   "creates a given function in the given namespace"
   [path ns-symbol var-desc]
   (let [var-name (get var-desc "name")
@@ -52,7 +53,7 @@
                                            req (assoc base-req :id (generate-uuid) :args enc-args)]
                                        (exec/delay-send #(fn-body-chan req)))))))
 
-(defn make-ns
+(defn- make-ns
   "make namespace as provided via the describe msg received"
   [path ns-desc]
   ;;(prn "making" ns-desc)
@@ -74,9 +75,10 @@
 (defn start-pod
   "starts the netpod via shell as a subprocess 
    the pod process is expected to accept the socket path as its first argument
-   this function returns a promise
+   this function returns the object representing the running pod
+   or throws an exception if there is trouble
   "
-  [pod-path socket-path]
+  [pod-path socket-path timeout-ms]
   (.delete (io/file socket-path))
   (let [prom (promise)
         background-proc (process [pod-path socket-path] {:wait false})]
@@ -85,7 +87,37 @@
 
        (loop []
          (when (not (.exists (io/file socket-path)))
-           (Thread/sleep 100)
+           (Thread/sleep 50)
            (recur)))
        (deliver prom background-proc)))
-    prom))
+    (if (= :timeout (deref
+                     prom
+                     timeout-ms
+                     :timeout))
+      (throw (ex-info "timed out while waiting for pod to start" {:pod-executable pod-path
+                                                                  :socket socket-path}))
+      {:process @prom
+       :socket socket-path
+       :pod-executable pod-path})))
+
+(defn stop-pod
+  "stops the netpod specified and kills the running netpod subprocess"
+  [netpod]
+  (process/destroy (:process netpod)))
+
+(defmacro with-pod
+  "Convenience macro that will combine `start-pod`, `load-pod` adn `stop-pod` to ensure pod namespaces are loaded,
+  before lazily evaluating the body at runtime.
+  It will also stop the process returned by `start-pod` upon exit."
+  [pod-executable & body]
+  `(let [temp-file# ~(fs/create-temp-file
+                      {:dir "/tmp"
+                       :prefix "netpod"
+                       :suffix ".sock"})
+         temp-file-path# (.toString temp-file#)
+         pod# (start-pod ~pod-executable temp-file-path# 5000)]
+     (try
+       (load-pod temp-file-path#)
+       (eval '(do ~@body))
+       (finally
+         (stop-pod pod#)))))

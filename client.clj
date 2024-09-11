@@ -1,54 +1,38 @@
 #!/usr/bin/env bb
 
-(require
- '[babashka.process :as process]
- '[clojure.core.async :as a :refer [<!]]
- '[netpod.pods :as pods])
+(require '[netpod.pods :as pods])
 
-(def socket-path "/tmp/sample-service.sock")
+(pods/with-pod "./server/server"
+  ;;if require is not suitable can also resolve things dynamically e.g. sample.service/greet
+  (prn "basic sync response from server" ((ns-resolve 'sample.service 'greet) "abe"))
+  ;;use require
+  (require
+   '[clojure.core.async :as a :refer [<!]]
+   '[sample.service :as srv])
 
-;; start a process to run in the background
-(def child-process (pods/start-pod "./server/server" socket-path))
-;;wait for it to start - with timeout 2s timeout
-(when (= :timeout (deref child-process 2000 :timeout))
-  (throw (ex-info "timeout reached while waiting on pod to start" {})))
+  (prn "basic sync response from server" @(srv/greet-delay "slow pete"))
+  (let [ch (srv/greet-chan "john")
+        result (<! ch)]
+    (prn "got from server" result))
+  (let [ch (srv/broken-func-chan "fred")
+        result (<! ch)]
+    (prn "got from server" result))
+  ;;now run many requests
+  (let [size 1000
+        numbers (range size)
+        chs (into [] (for [num numbers] (srv/greet-chan (str "channel task" (inc num)))))
+        ch (a/merge chs)]
+    (loop []
+      (if-let [value (<! ch)]
+        (do
+          (println "Received:" value)
+          (recur))
+        (println "Channel closed"))))
+  ;;now run many via requests
+  (println "doing the delay")
+  (let [size 1000
+        numbers (range size)
+        ps (into [] (for [num numbers] (srv/greet-delay (str "delay task" (inc num)))))]
+    (doseq [r ps]
+      (println "Received:" @r))))
 
-;;load pod from netpod
-(pods/load-pod socket-path)
-
-(def lazy-code
-  '(do
-     (require '[sample.service :as srv])
-     (prn "basic sync response from server" (srv/greet "abe"))
-     (prn "basic sync response from server" @(srv/greet-delay "slow pete"))
-     (let [ch (srv/greet-chan "john")
-           result (<! ch)]
-       (prn "got from server" result))
-     (let [ch (srv/broken-func-chan "fred")
-           result (<! ch)]
-       (prn "got from server" result))
-     ;;now run many requests
-     (let [size 1000
-           numbers (range size)
-           chs (into [] (for [num numbers] (srv/greet-chan (str "channel task" (inc num)))))
-           ch (a/merge chs)]
-       (loop []
-         (if-let [value (<! ch)]
-           (do
-             (println "Received:" value)
-             (recur))
-           (println "Channel closed"))))
-     ;;now run many via requests
-     (println "doing the delay")
-     (let [size 1000
-           numbers (range size)
-           ps (into [] (for [num numbers] (srv/greet-delay (str "delay task" (inc num)))))]
-       (doseq [r ps]
-         (println "Received:" @r)))))
-
-;;call it if we have the namespace
-(when (some? (find-ns 'sample.service))
-  (eval lazy-code))
-
-;;turn off the child process at the end
-(process/destroy @child-process)
