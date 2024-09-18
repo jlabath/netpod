@@ -81,7 +81,10 @@
   [pod-path socket-path timeout-ms]
   (.delete (io/file socket-path))
   (let [prom (promise)
-        background-proc (process [pod-path socket-path] {:wait false})]
+        background-proc (process [pod-path socket-path]
+                                 {:wait false
+                                  :out :inherit
+                                  :err :inherit})]
     (exec/delay-send
      (fn []
 

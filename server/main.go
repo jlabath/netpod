@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -10,11 +11,11 @@ import (
 	pod "github.com/jlabath/netpod/server/pod"
 )
 
-func greetHandler(encodedArgs []json.RawMessage) (json.RawMessage, error) {
-	if len(encodedArgs) < 1 {
-		return nil, fmt.Errorf("invalid number of arguments passed to server")
-	}
+func greetHandler(ctx context.Context, encodedArgs []json.RawMessage) (json.RawMessage, error) {
 	var name string
+	if err := pod.DecodeArgs(encodedArgs, &name); err != nil {
+		return nil, fmt.Errorf("greetHandler: %w", err)
+	}
 
 	if err := json.Unmarshal(encodedArgs[0], &name); err != nil {
 		return nil, err
@@ -26,7 +27,7 @@ func greetHandler(encodedArgs []json.RawMessage) (json.RawMessage, error) {
 	return json.Marshal(fmt.Sprintf("hi there %s", name))
 }
 
-func brokenHandler(encodedArgs []json.RawMessage) (json.RawMessage, error) {
+func brokenHandler(ctx context.Context, encodedArgs []json.RawMessage) (json.RawMessage, error) {
 	//sleep somewhat
 	time.Sleep(time.Millisecond * time.Duration(rand.Intn(1000)+1))
 	return nil, fmt.Errorf("this will fail")

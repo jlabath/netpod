@@ -1,6 +1,7 @@
 package pod
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 )
@@ -77,4 +78,4 @@ type ErrorResponse struct {
 }
 
 // Handler describes function to be used to serve requests
-type Handler func(args []json.RawMessage) (json.RawMessage, error)
+type Handler func(ctx context.Context, args []json.RawMessage) (json.RawMessage, error)

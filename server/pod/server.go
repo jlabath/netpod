@@ -1,6 +1,7 @@
 package pod
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -86,7 +87,9 @@ func handleRequest(desc *DescribeResponse, handlerMap map[string]Handler, w io.W
 			if err := json.Unmarshal([]byte(r.Args), &args); err != nil {
 				return err
 			}
-			if resp, err := h(args); err != nil {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if resp, err := h(ctx, args); err != nil {
 				return err
 			} else {
 				iRes := InvokeResponse{
