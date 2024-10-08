@@ -36,3 +36,8 @@ calling thread. Returns a channel which will receive the result of
     (apply send-cb f #(deliver p %) args)
     p))
 
+(defmacro promise-task
+  "similar to future from standard library except it returns a promise"
+  [& body]
+  `(let [f# (fn [] (do ~@body))]
+     (delay-send f#)))
