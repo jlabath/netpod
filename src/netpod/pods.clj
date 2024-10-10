@@ -25,33 +25,17 @@
   [path ns-symbol var-desc]
   (let [var-name (get var-desc "name")
         var-sym (symbol var-name)
-        chan-var-sym (symbol (format "%s-chan" var-name))
-        prom-var-sym (symbol (format "%s-delay" var-name))
         ns-name (str ns-symbol)
         fn-body-chan (partial ret-ex-as-value send-req path)
         base-req {:op "invoke"
                   :var (format "%s/%s" ns-name var-name)}]
-    (intern ns-symbol chan-var-sym (fn [& args]
-                                ;;encode args to json
-                                ;;craft invoke request
-                                ;;send it via executor
-                                     (let [enc-args (json/generate-string args)
-                                           req (assoc base-req :id (generate-uuid) :args enc-args)]
-                                       (exec/async-send #(fn-body-chan req)))))
     (intern ns-symbol var-sym (fn [& args]
                                 ;;encode args to json
                                 ;;craft invoke request
-                                ;;send it via sync-send
+                                ;;send it via promise-send
                                 (let [enc-args (json/generate-string args)
                                       req (assoc base-req :id (generate-uuid) :args enc-args)]
-                                  (exec/sync-send #(fn-body-chan req)))))
-    (intern ns-symbol prom-var-sym (fn [& args]
-                                ;;encode args to json
-                                ;;craft invoke request
-                                ;;send it via sync-send
-                                     (let [enc-args (json/generate-string args)
-                                           req (assoc base-req :id (generate-uuid) :args enc-args)]
-                                       (exec/delay-send #(fn-body-chan req)))))))
+                                  (exec/promise-send #(fn-body-chan req)))))))
 
 (defn- make-ns
   "make namespace as provided via the describe msg received"
@@ -85,7 +69,7 @@
                                  {:wait false
                                   :out :inherit
                                   :err :inherit})]
-    (exec/delay-send
+    (exec/promise-send
      (fn []
 
        (loop []
