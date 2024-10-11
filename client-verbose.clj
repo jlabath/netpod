@@ -13,34 +13,27 @@
 
 ;;load pod from netpod
 (pods/load-pod socket-path)
+(require '[sample.service :as srv])
 
-(def lazy-code
-  '(do
-     (require
-      '[clojure.core.async :as a :refer [<!]]
-      '[sample.service :as srv])
-     (prn "basic sync response from server" @(srv/greet "abe"))
+(prn "basic sync response from server" @(srv/greet "abe"))
+(let [result (srv/broken-func "fred")]
+  (prn "got from server" @result))
 
-     (let [result (srv/broken-func "fred")]
-       (prn "got from server" @result))
-     ;;now run many via requests
-     (println "doing the delay")
-     (time (let [size 2000
-                 numbers (range size)
-                 ps (into [] (for [num numbers] (srv/greet (str "delay task" (inc num)))))]
-             (doseq [r ps]
-               (println "Received:" @r))))))
-
-;;call it if we have the namespace
-(when (some? (find-ns 'sample.service))
-  (eval lazy-code))
+;;many requests
+(time (let [size 1000
+            numbers (range size)
+            ps (into [] (for [num numbers] (srv/greet (str "task" (inc num)))))]
+        (doseq [r ps]
+          (println "Received:" @r))))
 
 (let
- [p (promise-task
-     (println "I AM IN ANOTHER THREAD")
+ [num 41
+  p (promise-task
+     (println "promise task sleeping")
      (flush)
      (Thread/sleep 500)
-     (inc 41))]
+     (inc num))]
   (println (format "result is %d" @p)))
+
 ;;turn off the child process at the end
 (pods/stop-pod netpod-process)

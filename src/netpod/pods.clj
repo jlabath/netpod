@@ -93,9 +93,11 @@
   (process/destroy (:process netpod)))
 
 (defmacro with-pod
-  "Convenience macro that will combine `start-pod`, `load-pod` adn `stop-pod` to ensure pod namespaces are loaded,
-  before lazily evaluating the body at runtime.
-  It will also stop the process returned by `start-pod` upon exit."
+  "Convenience macro that will combine `start-pod`, `load-pod` to ensure pod namespaces are loaded,
+  before evaluating the body.
+  It will also stop the process returned by `start-pod` upon exit.
+  Since the namespaces are created dynamically at runtime please use (resolve 'my.netpod/some-func),
+  instead of directly refering to symbols that may not yet exist."
   [pod-executable & body]
   `(let [temp-file# ~(fs/create-temp-file
                       {:dir "/tmp"
@@ -105,6 +107,6 @@
          pod# (start-pod ~pod-executable temp-file-path# 5000)]
      (try
        (load-pod temp-file-path#)
-       (eval '(do ~@body))
+       (do ~@body)
        (finally
          (stop-pod pod#)))))
