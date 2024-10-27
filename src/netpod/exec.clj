@@ -19,5 +19,8 @@
 (defmacro promise-task
   "similar to future from standard library except it returns a promise"
   [& body]
-  `(let [f# (fn [] (do ~@body))]
+  `(let [f# (fn [] (try
+                     (do ~@body)
+                     (catch java.lang.Exception ex ex)))]
+
      (promise-send f#)))
