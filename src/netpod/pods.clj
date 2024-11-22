@@ -109,4 +109,5 @@
        (load-pod temp-file-path#)
        (do ~@body)
        (finally
-         (stop-pod pod#)))))
+         (stop-pod pod#)
+         (io/delete-file temp-file-path# :silently)))))
