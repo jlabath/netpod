@@ -6,6 +6,7 @@ The idea is the same as babashka pods except the babashka script and child proce
 
 ## Existing netpods
 
+* [BigQuery](https://github.com/jlabath/netpod-jlabath-bigquery)
 * [DuckDB](https://github.com/jlabath/netpod-jlabath-duckdb)
 * [MongoDB](https://github.com/jlabath/netpod-jlabath-mongo)
 * [SQLite](https://github.com/jlabath/netpod-jlabath-sqlite)
