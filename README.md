@@ -14,7 +14,7 @@ The idea is the same as babashka pods except the babashka script and child proce
 ## Motivation
 
 I had a need to talk to MongoDB, and I did not feel like getting familiar with Java ecosystem and rewriting my script as Clojure/JVM app.  
-At first I tried writing it as a [babashka pod](https://github.com/babashka/pods) but that version did not mean my requrements in terms of async I/O and concurrency.  
+At first I tried writing it as a [babashka pod](https://github.com/babashka/pods) but that version did not meet my requrements in terms of async I/O and concurrency.  
 So I took the ideas of babashka pods and modified them slightly for client/server model based on unix sockets.  
 
 ## Technical Details
