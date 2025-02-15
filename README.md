@@ -17,6 +17,10 @@ I had a need to talk to MongoDB, and I did not feel like getting familiar with J
 At first I tried writing it as a [babashka pod](https://github.com/babashka/pods) but that version did not meet my requrements in terms of async I/O and concurrency.  
 So I took the ideas of babashka pods and modified them slightly for client/server model based on unix sockets.  
 
+## How it works
+
+![Netpod communication diagram](sample-diagram.svg)
+
 ## Technical Details
 
 Netpod protocol is the subset of [pods protocol](https://github.com/babashka/pods/blob/master/README.md#the-protocol). Currently only the `describe` and `invoke` operations are supported.  
