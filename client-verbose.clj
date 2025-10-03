@@ -9,7 +9,7 @@
 (def socket-path "/tmp/sample-service.sock")
 
 ;; start a process to run in the background
-(def netpod-process (pods/start-pod "./server/server" socket-path 2000))
+(def netpod-process (pods/start-pod "./server/server" socket-path 2000 {"SOME_VAR" "hello there i got this extra env"}))
 
 ;;load pod from netpod
 (pods/load-pod socket-path)

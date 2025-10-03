@@ -62,13 +62,14 @@
    this function returns the object representing the running pod
    or throws an exception if there is trouble
   "
-  [pod-path socket-path timeout-ms]
+  [pod-path socket-path timeout-ms env]
   (.delete (io/file socket-path))
   (let [prom (promise)
         background-proc (process [pod-path socket-path]
                                  {:wait false
                                   :out :inherit
-                                  :err :inherit})]
+                                  :err :inherit
+                                  :extra-env env})]
     (exec/promise-send
      (fn []
 
@@ -104,7 +105,27 @@
                        :prefix "netpod"
                        :suffix ".sock"})
          temp-file-path# (.toString temp-file#)
-         pod# (start-pod ~pod-executable temp-file-path# 5000)]
+         pod# (start-pod ~pod-executable temp-file-path# 5000 {})]
+     (try
+       (load-pod temp-file-path#)
+       (do ~@body)
+       (finally
+         (stop-pod pod#)
+         (io/delete-file temp-file-path# :silently)))))
+
+(defmacro with-pod-env
+  "Convenience macro that will combine `start-pod`, `load-pod` to ensure pod namespaces are loaded,
+  before evaluating the body.
+  It will also stop the process returned by `start-pod` upon exit.
+  Since the namespaces are created dynamically at runtime please use (resolve 'my.netpod/some-func),
+  instead of directly refering to symbols that may not yet exist."
+  [pod-executable env & body]
+  `(let [temp-file# ~(fs/create-temp-file
+                      {:dir "/tmp"
+                       :prefix "netpod"
+                       :suffix ".sock"})
+         temp-file-path# (.toString temp-file#)
+         pod# (start-pod ~pod-executable temp-file-path# 5000 ~env)]
      (try
        (load-pod temp-file-path#)
        (do ~@body)

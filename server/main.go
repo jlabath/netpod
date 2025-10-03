@@ -45,6 +45,9 @@ func main() {
 	// socket file path is first argument given to program
 	socketPath := os.Args[1]
 
+	//print out the environment variable could be useful for passing env vars to the pod e.g. db connection strings
+	fmt.Println("SOME_VAR", os.Getenv("SOME_VAR"))
+
 	//describe response
 	ds := pod.DescribeResponse{
 		Format: "json",
